@@ -189,7 +189,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         generators = []
         for frac, amp, amp_func in self._amplitudes:
             frac_prod = frac * frac.conj
-            integral = amp_func.integrate(limits=limits.get_subspace(amp_func.obs),norm_range=False)
+            integral = amp_func.integrate(limits=limits.get_subspace(amp_func.obs),norm=False)
 
             pseudo_yields.append(z.to_real( frac_prod*integral))
             generators.append(amp.decay_phasespace())
@@ -223,14 +223,14 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         return particle_dict
 
     @zfit.supports()
-    def _integrate(self, limits, norm_range):
+    def _integrate(self, limits, norm, *, options=None, params=None):
         # raise NotImplementedError
         external_integral = self._external_integral
         if external_integral is not None:
-            integral = self._external_integral(limits=limits, norm_range=norm_range)
+            integral = self._external_integral(limits=limits, norm=norm)
         else:
             integral = tf.reduce_sum(
-                    [(frac1 * frac2.conj) * amps.integrate(limits=limits, norm_range=norm_range)
+                    [(frac1 * frac2.conj) * amps.integrate(limits=limits, norm=norm)
                      for frac1, frac2, amps in self._amplitudes_combinations],
                     axis=0)
             integral = z.to_real(integral)
@@ -263,27 +263,31 @@ class AmplitudeProductCached(BaseFunctorFunc, SessionHolderMixin):
         def func(x):
             return amp1.func(x) * tf.math.conj(amp2.func(x))
 
-        return z.run_no_nan(func=func, x=x)
+        return func(x) #z.run_no_nan(func=func, x=x)
 
-    def _single_hook_integrate(self, limits, norm_range, name='_hook_integrate'):
+    #def _single_hook_integrate(self, limits, norm_range, name='_hook_integrate'):
+    def _single_hook_integrate(self, limits, norm, x, *, options):
         integral = self._cache.get("integral")
         if integral is None:
             self._cache['integral'] = {}
 
         # safer version
         if integral is not None:
-            integral = integral.get((limits, norm_range))
+            #integral = integral.get((limits, norm_range))
+            integral = integral.get((limits, norm))
         # safer version end
 
         if integral is None:
-            integral = super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
+            #integral = super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
+            integral = super()._single_hook_integrate(limits=limits, norm=norm, x=x, options=options)
             integral = self.sess.run(integral)
             integral_holder = tf.Variable(initial_value=integral, trainable=False,
                                           dtype=integral.dtype, use_resource=True)
             self.sess.run(integral_holder.initializer)
             # self._cache['integral'] = integral_holder
             # safer version
-            self._cache['integral'][(limits, norm_range)] = integral_holder
+            #self._cache['integral'][(limits, norm_range)] = integral_holder
+            self._cache['integral'][(limits, norm)] = integral_holder
             # safer version end
             integral = integral_holder
         return integral

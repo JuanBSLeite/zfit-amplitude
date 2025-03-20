@@ -63,5 +63,8 @@ if __name__ == "__main__":
     for dep in pdf.get_params():
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
 
-    pdf.sample(10)
-# EOF
+    #pdf.sample(10)
+    #trying to make this work
+    print(pdf.integrate(limits=D2Kpipi0.obs, norm=False))
+    #print(D2Kpipi0.obs)
+# # EOF
