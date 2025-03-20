@@ -7,6 +7,11 @@
 # =============================================================================
 """Decay handler."""
 
+import sys
+import os
+sys.path.insert(1, os.path.join(os.path.dirname(
+    os.path.realpath(__file__)), os.pardir))
+
 import operator
 import functools
 from typing import Tuple, Optional
@@ -17,7 +22,6 @@ from particle import Particle
 from particle.particle import literals as lp
 
 import zfit
-from zfit import ztf
 from zfit.core.parameter import Parameter, ComplexParameter
 from zfit.util import ztyping
 
@@ -73,7 +77,7 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
         B+ -> Kres+ (-> Vres (-> P2 P3) P1) gamma
 
         """
-        kres_list = Particle.from_string_list(name=kres)
+        kres_list = Particle.from_name_list(name=kres)
         if not kres_list:
             raise ValueError(f"Badly specified Kres -> {kres}")
         elif len(kres_list) > 1:
@@ -81,7 +85,7 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
                              .format(kres, ','.join(res.fullname for res in kres_list)))
         else:
             self.kres = kres_list[0]
-        vres_list = Particle.from_string_list(name=vres)
+        vres_list = Particle.from_name_list(name=vres)
         if not vres_list:
             raise ValueError(f"Badly specified Vres -> {vres}")
         elif len(vres_list) > 1:
@@ -180,7 +184,7 @@ class Bp2KpipiGamma(Decay):
     def __init__(self, config_file):
         """Load fit config."""
         with open(config_file, 'r') as file_:
-            config = yaml.load(file_)
+            config = yaml.load(file_, Loader=yaml.FullLoader)
         # Load lambda_gamma
         lambda_gamma_sp = config['lambda_gamma'].split()
         self.lambda_gamma = zfit.Parameter("lambda_gamma", float(lambda_gamma_sp[0]))
@@ -242,10 +246,6 @@ if __name__ == "__main__":
     import tensorflow as tf
     import platform
 
-    if platform.system() == 'Darwin':
-        import matplotlib
-
-        matplotlib.use('TkAgg')
 
     import matplotlib.pyplot as plt
 
@@ -256,7 +256,7 @@ if __name__ == "__main__":
 
     pdf = decay.pdf("Test")
     pdf.update_integration_options(draws_per_dim=300000)
-    for dep in pdf.get_dependents(only_floating=False):
+    for dep in pdf.get_params()(only_floating=False):
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
     print("limits area", limits.area())
     zfit.settings.set_verbosity(6)
@@ -269,77 +269,12 @@ if __name__ == "__main__":
         plt.figure()
         plt.title(obs)
         plt.hist(sample_np[:, i], bins=35)
-    # plt.title(sample.obs[1])
-    # plt.hist(zfit.run(sample)[:, 1])
-    # plt.figure()
-    # plt.title(sample.obs[2])
-    # plt.hist(zfit.run(sample)[:, 2])
-    # plt.figure()
-    # plt.title(sample.obs[3])
-    # plt.hist(zfit.run(sample)[:, 3])
+
     plt.show()
     nll = zfit.loss.UnbinnedNLL(model=pdf, data=sample, fit_range=limits)
     minimizer = zfit.minimize.MinuitMinimizer(verbosity=10)
-    for param in nll.get_dependents():
+    for param in nll.get_params()():
         param.load(0.8)
     result = minimizer.minimize(loss=nll)
     print(result.fmin)
-    # sample_np = zfit.run(sample)
-    # print(sample_np)
-    # probs = pdf.pdf(x=sample, norm_range=limits)
-    # print(zfit.run(probs))
-    # x = np.random.uniform(high=np.ones(shape=16) * 50000, size=(10000, 16))
-    # # probs = pdf.pdf(x=x)
-    # # tf.add_check_numerics_ops()
-    #
-    # vals = pdf.unnormalized_pdf(x=x, component_norm_range=limits)
-    # print([val for val in zfit.run(vals) if val != 0])
-    # integral = pdf.integrate(limits=limits, norm_range=limits)
-    # integral_np = zfit.run(integral)
-    # print(integral_np)
-    # probs_np = zfit.run(probs)
-    # print(probs_np)
-
-    # import tensorflow_probability as tfp
-
-    # samples, _ = tfp.mcmc.sample_chain(
-    #         num_results=1000,
-    #         current_state=10000 * np.ones(shape=(1, 16)),
-    #         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-    #                 target_log_prob_fn=lambda x: tf.log(
-    #                     ztf.constant(1e-81) + pdf.unnormalized_pdf(x=x, component_norm_range=limits)),
-    #                 step_size=np.ones(shape=(1, 16)) * 100.,
-    #                 seed=54),
-    #         num_burnin_steps=30000,
-    #         num_steps_between_results=1,  # Thinning.
-    #         parallel_iterations=10)
-    # # samples = tf.stack(samples, axis=-1)
-    # samples_np = zfit.run(samples)
-    # print(samples_np)
-
-    # step_size = tf.Variable(name='step_size', initial_value=1., use_resource=True, trainable=False,
-    #                         dtype=tf.float64)
-    # zfit.run(step_size.initializer)
-    # samples, _ = tfp.mcmc.sample_chain(
-    #         num_results=1000,
-    #         current_state=100 * np.ones(shape=(1, 16)),
-    #         kernel=tfp.mcmc.HamiltonianMonteCarlo(
-    #                 target_log_prob_fn=lambda x: tf.log(
-    #                         ztf.constant(1e-88) + pdf.unnormalized_pdf(x=x, component_norm_range=limits)),
-    #                 num_leapfrog_steps=3,
-    #                 step_size=step_size,
-    #                 step_size_update_fn=tfp.mcmc.make_simple_step_size_update_policy()),
-    #         num_burnin_steps=1000,
-    #         num_steps_between_results=1,  # Thinning.
-    #         parallel_iterations=4)
-    # # samples = tf.stack(samples, axis=-1)
-    # samples_np = zfit.run(samples)
-    # samples = ztf.convert_to_tensor(samples_np[:, 0, :])
-    # samples_data = zfit.data.Data.from_tensor(obs=[str(i) for i in range(16)], tensor=samples)
-    # probs = pdf.pdf(x=samples_data, norm_range=limits)
-    # probs_np = zfit.run(probs)
-
-    # print(samples_np)
-    # print("probs", probs_np)
-
-# EOF
+   

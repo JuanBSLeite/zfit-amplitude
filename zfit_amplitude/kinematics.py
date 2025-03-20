@@ -10,7 +10,7 @@
 import tensorflow as tf
 
 import zfit
-from zfit import ztf
+from zfit import z
 
 
 def zemach_tensor(m2ab, m2ac, m2bc, m2d, m2a, m2b, m2c, spin):
@@ -19,13 +19,13 @@ def zemach_tensor(m2ab, m2ac, m2bc, m2d, m2a, m2b, m2c, spin):
     """
     z = None
     if spin == 0:
-        z = tf.complex(ztf.constant(1.), ztf.constant(0.))
+        z = tf.complex(z.constant(1.), z.constant(0.))
     if spin == 1:
-        z = tf.complex(m2ac - m2bc + (m2d - m2c) * (m2b - m2a) / m2ab, ztf.constant(0.))
+        z = tf.complex(m2ac - m2bc + (m2d - m2c) * (m2b - m2a) / m2ab, z.constant(0.))
     if spin == 2:
         z = tf.complex((m2bc - m2ac + (m2d - m2c) * (m2a - m2b) / m2ab) ** 2 - 1. / 3. * (
                 m2ab - 2. * (m2d + m2c) + (m2d - m2c) ** 2 / m2ab) * (
-                               m2ab - 2. * (m2a + m2b) + (m2a - m2b) ** 2 / m2ab), ztf.constant(0.))
+                               m2ab - 2. * (m2a + m2b) + (m2a - m2b) ** 2 / m2ab), z.constant(0.))
     return z
 
 
@@ -37,7 +37,7 @@ def two_body_momentum(md, ma, mb, calc_complex_=False):
     """
     squared_sum = (md ** 2 - (ma + mb) ** 2) * (md ** 2 - (ma - mb) ** 2) / (4 * md ** 2)
     if calc_complex_:
-        squared_sum = ztf.to_complex(squared_sum)
+        squared_sum = z.to_complex(squared_sum)
     return tf.sqrt(squared_sum)
 
 
@@ -162,7 +162,7 @@ def metric_tensor():
     """
     Metric tensor for Lorentz space (constant)
     """
-    return ztf.constant([-1., -1., -1., 1.], dtype=zfit.settings.ztypes.float)
+    return z.constant([-1., -1., -1., 1.], dtype=zfit.settings.ztypes.float)
 
 
 def lorentz_dot_product(vec1, vec2):
@@ -184,22 +184,22 @@ def pol_vector(p, hel):
     pz = p[:, 2] / p[:, 3]
     r2 = px ** 2 + py ** 2
     s = tf.math.sin(tf.math.acos(pz))
-    one_over_sqrt_two = ztf.to_complex((1 / tf.sqrt(ztf.constant(2.))))
+    one_over_sqrt_two = z.to_complex((1 / tf.sqrt(z.constant(2.))))
 
     if hel == 1:
-        c0 = one_over_sqrt_two * ztf.complex(((1 - pz) * py ** 2) / r2 + pz,
+        c0 = one_over_sqrt_two * z.complex(((1 - pz) * py ** 2) / r2 + pz,
                                              px * py * (1 - pz) / r2)
-        c1 = one_over_sqrt_two * ztf.complex(-px * py * (1 - pz) / r2,
+        c1 = one_over_sqrt_two * z.complex(-px * py * (1 - pz) / r2,
                                              -((1 - pz) * px ** 2) / r2 - pz)
-        c2 = one_over_sqrt_two * ztf.complex(-px * s / r2 ** 0.5,
+        c2 = one_over_sqrt_two * z.complex(-px * s / r2 ** 0.5,
                                              py * s / r2 ** 0.5)
         c3 = tf.zeros_like(c0, dtype=tf.complex128)
     if hel == -1:
-        c0 = one_over_sqrt_two * ztf.complex(-(((1 - pz) * py ** 2) / r2 + pz),
+        c0 = one_over_sqrt_two * z.complex(-(((1 - pz) * py ** 2) / r2 + pz),
                                              px * py * (1 - pz) / r2)
-        c1 = one_over_sqrt_two * ztf.complex(px * py * (1 - pz) / r2,
+        c1 = one_over_sqrt_two * z.complex(px * py * (1 - pz) / r2,
                                              -((1 - pz) * px ** 2) / r2 - pz)
-        c2 = one_over_sqrt_two * ztf.complex(px * s / r2 ** 0.5,
+        c2 = one_over_sqrt_two * z.complex(px * s / r2 ** 0.5,
                                              py * s / r2 ** 0.5)
         c3 = tf.zeros_like(c0, dtype=tf.complex128)
 

@@ -22,12 +22,10 @@ import zfit_amplitude.kinematics as kinematics
 class DalitzParticle(Particle):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.dalitz_name = str(self)
-
 
 def get_mass_var_name(part1, part2):
     """Get Dalitz mass var name."""
-    return f"m2{part1.dalitz_name}{part2.name}"
+    return f"m2{part1.name}{part2.name}"
 
 
 class ThreeBodyDalitz(Decay):
@@ -35,16 +33,16 @@ class ThreeBodyDalitz(Decay):
     def __init__(self, top_particle, final_state_particles):
         if len(final_state_particles) != 3:
             raise ValueError("You need three final state particles!")
-        self._top = DalitzParticle.from_string(top_particle)
-        parts = p1, p2, p3 = [DalitzParticle.from_string(part)
+        self._top = DalitzParticle.from_name(top_particle)
+        parts = p1, p2, p3 = [DalitzParticle.from_name(part)
                               for part in final_state_particles]
         # Check names and add suffixes if necessary
         for part_num, part_name in enumerate(final_state_particles):
             part_obj = parts[part_num]
             name_counts = final_state_particles[:part_num].count(part_name)
             if name_counts > 0:
-                part_obj.dalitz_name = f"{part_obj.dalitz_name}{name_counts-0}"
-        self._parts = OrderedDict((part.dalitz_name, part) for part in parts)
+                part_obj.name = f"{part_obj.name}{name_counts-0}"
+        self._parts = OrderedDict((part.name, part) for part in parts)
         # Build observables
         obs1 = zfit.Space(obs=get_mass_var_name(p1, p2),
                           limits=((p1.mass + p2.mass)**2,
@@ -88,7 +86,7 @@ class ThreeBodyDalitz(Decay):
 
         non_resonant_part = [part for part_name, part in self._parts.items()
                              if part_name not in resonance_children][0]
-        resonance = DalitzParticle.from_string(resonance)
+        resonance = DalitzParticle.from_name(resonance)
         decay_tree = (self._top, [
             (resonance, [(self._parts[part_name], [])
                          for part_name in resonance_children]),
@@ -109,14 +107,14 @@ class ThreeBodyAmplitude(Amplitude):
         resonance_children = [child[0] for child in resonance_children]
         non_resonant_part = [child[0] for child in children if not child[1]][0]
 
-        res_mass = resonance_mass(resonance.mass, resonance.width, resonance.dalitz_name)
+        res_mass = resonance_mass(resonance.mass, resonance.width, resonance.name)
         decay_tree = (top.name, top.mass, [
-            (resonance.dalitz_name, res_mass, [(part.dalitz_name, part.mass, [])
+            (resonance.name, res_mass, [(part.name, part.mass, [])
                                                for part in resonance_children]),
-            (non_resonant_part.dalitz_name, non_resonant_part.mass, [])])
+            (non_resonant_part.name, non_resonant_part.mass, [])])
 
         self.resonance = resonance
-        self.particles = {part.dalitz_name: part
+        self.particles = {part.name: part
                           for part in resonance_children + [non_resonant_part]}
         self.mass_var = get_mass_var_name(*resonance_children)
         self.amplitude_func = amplitude_func

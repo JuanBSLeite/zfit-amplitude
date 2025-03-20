@@ -10,7 +10,7 @@
 import tensorflow as tf
 
 import zfit
-from zfit import ztf
+from zfit import z
 
 import zfit_amplitude.kinematics as kinematics
 
@@ -20,18 +20,18 @@ def relativistic_breit_wigner(m2, mres, wres):
     Relativistic Breit-Wigner
     """
     # TODO: Check complex
-    below_div = (ztf.to_complex(mres ** 2 - m2) - tf.complex(ztf.constant(0.), mres) * ztf.to_complex(wres))
+    below_div = (z.to_complex(mres ** 2 - m2) - tf.complex(z.constant(0.), mres) * z.to_complex(wres))
     # real_part = tf.real(below_div)
     # imag_part = tf.imag(below_div)
     # result = tf.complex(1. / real_part, 1. / imag_part)
     # return result
     # return tf.cast(1. / tf.cast(below_div, dtype=tf.complex64), dtype=tf.complex128)
-    return 1. / below_div
+    return z.complex(1.,0.) / below_div
 
 
 # class FancyAlbert(zfit.func.ZFunc):
 #     def _func(self, x):
-#         obs = ztf.unstack_x(x)
+#         obs = z.unstack_x(x)
 #         return self.FUNC(*obs, **self.params)
 
 
@@ -48,14 +48,14 @@ def relativistic_breit_wigner(m2, mres, wres):
 
 # relativistic_breit_wigner = make_func(func=relativistic_breit_wigner, params=['mres', 'wres'])
 
-class RelativisticBreitWigner(zfit.func.BaseFunc):
+class RelativisticBreitWigner(zfit.func.BaseFuncV1):
     def __init__(self, obs, name, mres, wres, using_m_squared=False):
         self.using_m_squared = using_m_squared
         super().__init__(obs=obs, name=name, dtype=zfit.settings.ztypes.complex,
                          params={'mres': mres, 'wres': mres})
 
     def _func(self, x):
-        var = ztf.unstack_x(x)
+        var = z.unstack_x(x)
         if isinstance(var, list):
             m_sq = kinematics.mass_squared(tf.reduce_sum(
                 [kinematics.lorentz_vector(kinematics.vector(px, py, pz), pe)
@@ -79,7 +79,7 @@ def blatt_weisskopf_ff(q, q0, d, l):
 
     def hankel1(x):
         if l == 0:
-            return ztf.constant(1.)
+            return z.constant(1.)
         if l == 1:
             return 1 + x ** 2
         if l == 2:
@@ -128,10 +128,10 @@ def breit_wigner_line_shape(m2, m0, gamma0, ma, mb, mc, md, dr, dd, lr, ld, barr
         b1 = orbital_barrier_factor(p, p0, lr)
         b2 = orbital_barrier_factor(q, q0, ld)
         ff *= b1 * b2
-    return bw * tf.complex(ff, ztf.constant(0.))
+    return bw * tf.complex(ff, z.constant(0.))
 
 
-class BreitWignerLineshape(zfit.func.BaseFunc):
+class BreitWignerLineshape(zfit.func.BaseFuncV1):
     """Func version of `breit_wigner_line_shape`."""
 
     def __init__(self, obs, name,
@@ -144,7 +144,7 @@ class BreitWignerLineshape(zfit.func.BaseFunc):
 
     def _func(self, x):
         def func(x):
-            var = ztf.unstack_x(x)
+            var = z.unstack_x(x)
             if isinstance(var, list):
                 m_sq = kinematics.mass(tf.reduce_sum(
                     [kinematics.lorentz_vector(kinematics.vector(px, py, pz), pe)
@@ -168,7 +168,7 @@ class BreitWignerLineshape(zfit.func.BaseFunc):
             md0 = self.params['md0']
             return breit_wigner_line_shape(m_sq, m0, gamma0, ma, mb, mc, md, dr, dd, lr, ld,
                                            self.barrier_factor, ma0, md0)
-        return ztf.run_no_nan(func=func, x=x)
+        return z.run_no_nan(func=func, x=x)
 
 
 def spin_factor_oneplus_swave(pol0, p1, p2, p3, mresa, mresv):
@@ -190,7 +190,7 @@ def spin_factor_oneplus_swave(pol0, p1, p2, p3, mresa, mresv):
                       kinematics.lorentz_dot_product(tf.imag(tf.conj(pol0)), spinsumv))
 
 
-class SpinFactor(zfit.func.BaseFunc):
+class SpinFactor(zfit.func.BaseFuncV1):
     """Order of observables: p1, p2, p3, pgamma"""
 
     SPIN_FACTORS = {("1+", "S"): spin_factor_oneplus_swave}
@@ -205,7 +205,7 @@ class SpinFactor(zfit.func.BaseFunc):
         super().__init__(obs=obs, name=name, dtype=zfit.settings.ztypes.complex, params={})
 
     def _func(self, x):
-        components = ztf.unstack_x(x)
+        components = z.unstack_x(x)
         p1, p2, p3, pgamma = [kinematics.lorentz_vector(kinematics.vector(px, py, pz), pe)
                               for px, py, pz, pe in zip(*[iter(components)] * 4)]
         return self._spin_factor_function(kinematics.pol_vector(pgamma, self.helicity), p1, p2, p3,

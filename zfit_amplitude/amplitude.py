@@ -14,11 +14,12 @@ from itertools import combinations
 import tensorflow as tf
 
 import zfit
-from zfit import ztf
+from zfit import z
 from zfit.core.interfaces import ZfitFunc
 
-from zfit.models.functions import BaseFunctorFunc
-from zfit.util.execution import SessionHolderMixin
+from zfit.models.functions import BaseFunctorFuncV1 as BaseFunctorFunc
+from zfit.core.serialmixin import SerializableMixin as SessionHolderMixin
+#from zfit.util.execution import SessionHolderMixin
 
 from zfit_amplitude.utils import sanitize_string
 
@@ -167,9 +168,9 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                                                                  amp2=amp2))
                                          for (frac1, _, amp1), (frac2, _, amp2)
                                          in combinations(self._amplitudes, 2)]
-        self._top_at_rest = tf.stack((0.0, 0.0, 0.0, ztf.to_real(top_particle_mass)), axis=-1)
+        self._top_at_rest = tf.stack((0.0, 0.0, 0.0, z.to_real(top_particle_mass)), axis=-1)
         super().__init__(obs=obs, name=name, params={coef.name: coef for coef in coef_list}, **kwargs)
-        self.update_integration_options(draws_per_dim=300000)
+        self.update_integration_options(max_draws=1000000)
         self._sample_and_weights = MethodType(generator_sample_and_weights_factory, self)
 
     def _unnormalized_pdf(self, x):
@@ -178,28 +179,29 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                                    for frac1, frac2, amps
                                    in self._amplitudes_combinations],
                                   axis=0)
-            return ztf.to_real(value)
-
-        result = ztf.run_no_nan(unnormalized_pdf_func, x)
+            return z.to_real(value)
+    
+        result = z.run_no_nan(unnormalized_pdf_func, x)
         return result
 
     def _do_sample(self, n_to_produce, limits):
         pseudo_yields = []
         generators = []
         for frac, amp, amp_func in self._amplitudes:
-            pseudo_yields.append(ztf.to_real(frac * frac.conj *
-                                             amp_func.integrate(limits=limits.get_subspace(amp_func.obs),
-                                                                norm_range=False)))
+            frac_prod = frac * frac.conj
+            integral = amp_func.integrate(limits=limits.get_subspace(amp_func.obs),norm_range=False)
+
+            pseudo_yields.append(z.to_real( frac_prod*integral))
             generators.append(amp.decay_phasespace())
         sum_yields = sum(pseudo_yields)
-        n_to_generate = [tf.math.ceil(ztf.to_real(n_to_produce) * pseudo_yield / sum_yields)
+        n_to_generate = [tf.math.ceil(z.to_real(n_to_produce) * pseudo_yield / sum_yields)
                          for pseudo_yield in pseudo_yields]
 
         norm_weights = []
         particles = {}
         for amp_num in range(len(self._amplitudes)):
             print(f"Generating {amp_num}")
-            norm_weight, parts = generators[amp_num].generate(self._top_at_rest, n_to_generate[amp_num])
+            norm_weight, parts = generators[amp_num].generate(boost_to=tf.stack(self._top_at_rest*n_to_generate[amp_num]), n_events=n_to_generate[amp_num])
             norm_weights.append(norm_weight)
             for part_name, gen_parts in parts.items():
                 if part_name not in particles:
@@ -208,7 +210,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                 merged_particles = {part_name: tf.concat(particles, axis=0)
                                     for part_name, part_list in particles}
         merged_weights = tf.concat(norm_weights, axis=0)
-        thresholds = ztf.random_uniform(shape=(n_to_produce,))
+        thresholds = z.random.uniform(shape=(n_to_produce,))
         return merged_particles, thresholds, merged_weights, sum_yields, len(norm_weights)
 
     def _do_transform(self, particle_dict):
@@ -231,7 +233,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                     [(frac1 * frac2.conj) * amps.integrate(limits=limits, norm_range=norm_range)
                      for frac1, frac2, amps in self._amplitudes_combinations],
                     axis=0)
-            integral = ztf.to_real(integral)
+            integral = z.to_real(integral)
         return integral
 
 
@@ -261,7 +263,7 @@ class AmplitudeProductCached(BaseFunctorFunc, SessionHolderMixin):
         def func(x):
             return amp1.func(x) * tf.math.conj(amp2.func(x))
 
-        return ztf.run_no_nan(func=func, x=x)
+        return z.run_no_nan(func=func, x=x)
 
     def _single_hook_integrate(self, limits, norm_range, name='_hook_integrate'):
         integral = self._cache.get("integral")
@@ -381,14 +383,14 @@ class Amplitude:
         def create_particles(tree):
             part_list = []
             for part_name, part_mass, part_tree in tree:
-                part = phsp.Particle(part_name, mass=part_mass)
+                part = phsp.GenParticle(part_name, mass=part_mass)
                 if part_tree:
                     part.set_children(*create_particles(part_tree))
                 part_list.append(part)
             return part_list
 
         top_name, _, top_tree = self._decay_tree
-        return phsp.Particle(top_name).set_children(*create_particles(top_tree))
+        return phsp.GenParticle(top_name,self._top_mass).set_children(*create_particles(top_tree))
 
 
 class Resonance:
@@ -397,7 +399,7 @@ class Resonance:
     Arguments:
         particle (:py:class:`~particle.Particle`): Particle object corresponding to the
         resonance we want to model.
-        resonance_model (:py:class:`~zfit.func.BaseFunc`): Class to model the resonance.
+        resonance_model (:py:class:`~zfit.func.BaseFuncV1`): Class to model the resonance.
         model_config (dict): Configuration of `resonance_model`.
 
     """
@@ -415,7 +417,7 @@ class Resonance:
             extra_args (dict): Extra configuration to pass to the resonance model.
 
         Return:
-            :py:class:`~zfit.func.BaseFunc`
+            :py:class:`~zfit.func.BaseFuncV1`
 
         """
         args = self._model_config.copy()

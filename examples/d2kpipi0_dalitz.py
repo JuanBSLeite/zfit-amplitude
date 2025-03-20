@@ -11,11 +11,18 @@ This implementation uses zfit_amplitude.dalitz.
 
 """
 
+import sys
+import os
+sys.path.insert(1, os.path.join(os.path.dirname(
+    os.path.realpath(__file__)), os.pardir))
+
+
+
 from math import radians
 
 import zfit
 
-from zfit_amplitude.dalitz import ThreeBodyDalitz
+from zfit_amplitude.dalitz import ThreeBodyDalitz, DalitzParticle
 import zfit_amplitude.dynamics as dynamics
 
 
@@ -31,14 +38,14 @@ def bw_amplitude(mass_obs, resonance, _):
                                             using_m_squared=True)
 
 
-RESONANCES = [('rho(770)', ('pi-', 'pi0'), bw_amplitude),
+RESONANCES = [('rho(770)0', ('pi-', 'pi0'), bw_amplitude),
               ('K(2)*(1430)0', ('K+', 'pi-'), bw_amplitude),
               ('K(0)*(1430)+', ('K+', 'pi0'), bw_amplitude),
               ('K*(892)+', ('K+', 'pi0'), bw_amplitude),
               ('K(0)*(1430)0', ('K+', 'pi-'), bw_amplitude),
               ('K*(892)0', ('K+', 'pi-'), bw_amplitude)]
 
-COEFFS = {'rho(770)': polar_param('f_rho770', 1.0, 0.0, floating=False),
+COEFFS = {'rho(770)0': polar_param('f_rho770', 1.0, 0.0, floating=False),
           'K(2)*(1430)0': polar_param('f_K2star1430_0', 0.088, radians(-17.2)),
           'K(0)*(1430)+': polar_param('f_K0star1430_plus', 6.78, radians(69.1)),
           'K*(892)+': polar_param('f_Kstar892_plus', 0.899, radians(-171)),
@@ -47,12 +54,14 @@ COEFFS = {'rho(770)': polar_param('f_rho770', 1.0, 0.0, floating=False),
 
 
 if __name__ == "__main__":
+   
     D2Kpipi0 = ThreeBodyDalitz('D0', ['K+', 'pi-', 'pi0'])
     for res, children, amp in RESONANCES:
         D2Kpipi0.add_amplitude(res, children, amp,
                                COEFFS[res])
     pdf = D2Kpipi0.pdf("D2Kpipi0")
-    for dep in pdf.get_dependents(only_floating=False):
+    for dep in pdf.get_params():
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
 
+    pdf.sample(10)
 # EOF

@@ -7,6 +7,12 @@
 # =============================================================================
 """Implementation of the D0 -> K+ pi- pi0 Dalitz from PRL 103 (2009) 211801."""
 
+
+import sys
+import os
+sys.path.insert(1, os.path.join(os.path.dirname(
+    os.path.realpath(__file__)), os.pardir))
+
 from math import radians
 
 from particle.particle import literals as lp
@@ -17,6 +23,7 @@ import zfit
 from zfit_amplitude.amplitude import Decay, Amplitude, Resonance
 import zfit_amplitude.dynamics as dynamics
 import zfit_amplitude.kinematics as kinematics
+
 
 
 polar_param = zfit.ComplexParameter.from_polar
@@ -30,7 +37,7 @@ D_ZERO = lp.D_0
 
 RESONANCES = {'rho(770)': ('m2pipi', Resonance(lp.rho_770_plus,
                                                dynamics.RelativisticBreitWigner)),
-              'K2*(1430)0': ('m2kpim', Resonance(Particle.from_string('K(2)*(1430)'),
+              'K(2)*(1430)0': ('m2kpim', Resonance(Particle.from_name('K(2)*(1430)0'),
                                                  dynamics.RelativisticBreitWigner)),
               'K0*(1430)+': ('m2kpi0', Resonance(lp.K_0st_1430_plus,
                                                  dynamics.RelativisticBreitWigner)),
@@ -42,7 +49,7 @@ RESONANCES = {'rho(770)': ('m2pipi', Resonance(lp.rho_770_plus,
                                                dynamics.RelativisticBreitWigner))}
 
 COEFFS = {'rho(770)': polar_param('f_rho770', 1.0, 0.0, floating=False),
-          'K2*(1430)0': polar_param('f_K2star1430_0', 0.088, radians(-17.2)),
+          'K(2)*(1430)0': polar_param('f_K2star1430_0', 0.088, radians(-17.2)),
           'K0*(1430)+': polar_param('f_K0star1430_plus', 6.78, radians(69.1)),
           'K*(892)+': polar_param('f_Kstar892_plus', 0.899, radians(-171)),
           'K0*(1430)0': polar_param('f_K0star1430_0', 1.65, radians(-44.4)),
@@ -114,7 +121,7 @@ if __name__ == "__main__":
         D2Kpipi0.add_amplitude(D2Kpipi0Amplitude(res, res_model),
                                COEFFS[res])
     pdf = D2Kpipi0.pdf("D2Kpipi0")
-    for dep in pdf.get_dependents(only_floating=False):
+    for dep in pdf.get_params():
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
 
     pdf.sample(10)
