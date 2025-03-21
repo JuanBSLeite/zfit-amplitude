@@ -17,6 +17,7 @@ import zfit
 
 from zfit_amplitude.amplitude import Decay, Amplitude
 import zfit_amplitude.kinematics as kinematics
+import zfit_amplitude.dynamics as dynamics
 
 
 class DalitzParticle(Particle):
@@ -74,6 +75,7 @@ class ThreeBodyDalitz(Decay):
         def get_res_mass(mass, width, name):
             """Calculate resonance mass."""
             def get_resonance_mass(mass_min, mass_max, n_events):
+                # TODO: Why do we need this?
                 bw = dynamics.RelativisticBreitWigner(obs=zfit.Space(f'M({name})',
                                                                      mass_min, mass_max),
                                                       name=f'BW({name})',

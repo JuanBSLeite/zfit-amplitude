@@ -24,7 +24,7 @@ import zfit
 
 from zfit_amplitude.dalitz import ThreeBodyDalitz, DalitzParticle
 import zfit_amplitude.dynamics as dynamics
-
+zfit.run.set_graph_mode(False)
 
 polar_param = zfit.ComplexParameter.from_polar
 
@@ -63,8 +63,12 @@ if __name__ == "__main__":
     for dep in pdf.get_params():
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
 
-    #pdf.sample(10)
-    #trying to make this work
+
+    #trying to make this work first
     print(pdf.integrate(limits=D2Kpipi0.obs, norm=False))
-    #print(D2Kpipi0.obs)
+
+    #then we can try to sample
+    #pdf.sample(10)
+
+
 # # EOF

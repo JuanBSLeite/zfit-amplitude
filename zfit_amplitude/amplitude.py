@@ -189,11 +189,15 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         generators = []
         for frac, amp, amp_func in self._amplitudes:
             frac_prod = frac * frac.conj
+            #amp_func_squared = lambda x: z.abs_square(amp.pdf(x))
+            # TODO: It need to integrate the amplitude squared over the Dalitz plot, not the complex amplitude.
             integral = amp_func.integrate(limits=limits.get_subspace(amp_func.obs),norm=False)
 
-            pseudo_yields.append(z.to_real( frac_prod*integral))
+            pseudo_yields.append(z.to_real( frac_prod*z.to_complex(integral)))
             generators.append(amp.decay_phasespace())
         sum_yields = sum(pseudo_yields)
+
+        #TODO: What this ceil does?
         n_to_generate = [tf.math.ceil(z.to_real(n_to_produce) * pseudo_yield / sum_yields)
                          for pseudo_yield in pseudo_yields]
 
@@ -201,7 +205,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         particles = {}
         for amp_num in range(len(self._amplitudes)):
             print(f"Generating {amp_num}")
-            norm_weight, parts = generators[amp_num].generate(boost_to=tf.stack(self._top_at_rest*n_to_generate[amp_num]), n_events=n_to_generate[amp_num])
+            norm_weight, parts = generators[amp_num].generate(boost_to=tf.stack([self._top_at_rest]*294), n_events=n_to_generate[amp_num][0])
             norm_weights.append(norm_weight)
             for part_name, gen_parts in parts.items():
                 if part_name not in particles:
@@ -229,10 +233,16 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         if external_integral is not None:
             integral = self._external_integral(limits=limits, norm=norm)
         else:
-            integral = tf.reduce_sum(
-                    [(frac1 * frac2.conj) * amps.integrate(limits=limits, norm=norm)
-                     for frac1, frac2, amps in self._amplitudes_combinations],
-                    axis=0)
+            reduce_list= []
+            for frac1, frac2, amps in self._amplitudes_combinations:
+                    integral = amps.integrate(limits=limits, norm=False)
+                    reduce_list.append(frac1 * frac2.conj * z.to_complex(integral))
+
+            integral = tf.reduce_sum(reduce_list, axis=0)
+            # integral = tf.reduce_sum(
+            #         [(frac1 * frac2.conj) * z.to_complex(amps.integrate(limits=limits, norm=norm))
+            #          for frac1, frac2, amps in self._amplitudes_combinations],
+            #         axis=0)
             integral = z.to_real(integral)
         return integral
 
@@ -263,6 +273,8 @@ class AmplitudeProductCached(BaseFunctorFunc, SessionHolderMixin):
         def func(x):
             return amp1.func(x) * tf.math.conj(amp2.func(x))
 
+        #TODO: I Need to check better, but i think we need to return the real part of the product A_i*A_j^*
+        #TODO: What this run_no_nan does?
         return func(x) #z.run_no_nan(func=func, x=x)
 
     #def _single_hook_integrate(self, limits, norm_range, name='_hook_integrate'):
@@ -280,10 +292,11 @@ class AmplitudeProductCached(BaseFunctorFunc, SessionHolderMixin):
         if integral is None:
             #integral = super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
             integral = super()._single_hook_integrate(limits=limits, norm=norm, x=x, options=options)
-            integral = self.sess.run(integral)
+            #integral = self.sess.run(integral)
             integral_holder = tf.Variable(initial_value=integral, trainable=False,
                                           dtype=integral.dtype, use_resource=True)
-            self.sess.run(integral_holder.initializer)
+            
+            #self.sess.run(integral_holder.initializer)
             # self._cache['integral'] = integral_holder
             # safer version
             #self._cache['integral'][(limits, norm_range)] = integral_holder
